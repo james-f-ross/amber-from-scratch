@@ -20,7 +20,7 @@ pdb=$1
 # choose simulation time (ns) # not scripted yet
 time=1000
 
-# location of amber/arc input templates
+# location of salt checker
 templatedir=~/work/8-scripts/1-MD-scripts/amber-from-scratch
 
 # choose arc GPUs
@@ -28,6 +28,229 @@ arc=3p				# either 3k 3p or 4 		# 3k = arc3-K80, 3p = arc3-P100, 4 = arc4-V100
 
 # define arc login and report details
 USER=chmjro                 # string                # your username on the remote machine, if required
+
+########################################################################################
+# DECLARE NON-DEFAULT INPUT OPTIONS
+########################################################################################
+
+# declare number of parts # dont change these please.
+nmin=1
+neqi=1
+npro=1
+
+# EG. For second equilibration step with smaller restaints, state additional parts above the first and use a '_neqi' suffix to specify changed parameters
+#	neqi=2
+#	restraint_wt_neqi2=1.0
+
+# EG. for queuing 10 additional prodution runs (as default each run is 100 ns, so below generates 1 us, (provided 100 ns is attained in 48 hours)
+# note the use of the '_npro' suffix in the variable, this is necessary.
+npro=10
+nstlim_npro2=50000000
+nstlim_npro3=75000000
+nstlim_npro4=100000000
+nstlim_npro5=125000000
+nstlim_npro6=150000000
+nstlim_npro7=175000000
+nstlim_npro8=200000000
+nstlim_npro9=225000000
+nstlim_npro10=250000000
+
+
+
+
+########################################################################################
+# INPUT SIMULATION OPTIONS (DEFAULTS) only change if you want to change the defaults
+########################################################################################
+
+
+# print out a default minimisation input 
+# Minimization input file in explicit solvent
+
+# Defualt Minimization options (try not to change!)
+imin=1         # Turn on minimization
+maxcyc=5000    # Maximum number of minimization cycles
+ncyc=2500      # 100 steepest-descent steps, better for strained systems
+# Potential energy function options
+cut=12.0       # nonbonded cutoff, in Angstroms
+fswitch=10.0   # Force-based switching
+# Control how often information is printed to the output file
+ntpr=100       # Print energies every 100 steps
+ntxo=2         # Write NetCDF format
+# Restraint options
+ntr=1          # Positional restraints for proteins, sugars, and ligands
+restraint_wt=1.0
+restraintmask='@CA,C,O,N&!:WAT'
+# Set water atom/residue names for SETTLE recognition
+watnam='WAT'    # Water residues are named WAT
+owtnm='O'       # Water oxygens are named O
+
+for i in $(seq 1 $nmin) ; do
+# redefine interative variables
+eval  "$( ( set -o posix ; set ) | grep nmin$i= | sed 's/_nmin'$i'//g') " 
+
+# print mdin file	
+echo "Minimisation run
+ &cntrl
+    imin=$imin, maxcyc=$maxcyc, ncyc=$ncyc,  
+    cut=$cut, fswitch=$fswitch,
+    ntpr=$ntpr, ntxo=$ntxo,
+    ntr=$ntr, restraint_wt=$restraint_wt, restraintmask='$restraintmask',
+    watnam='$watnam', owtnm='$owtnm', 
+ /
+ &ewald
+    vdwmeth = 0,
+ /
+END" > min$i.mdin
+done
+
+# print out a default equilibration input 
+# A NVT simulation for common production-level simulations
+
+# Defualt equilibration options (try not to change!)
+imin=0        # No minimization
+irest=0       # This is NOT a restart of an old MD simulation
+ntx=1         # So our inpcrd file has no velocities
+# Temperature control
+ntt=3         # Langevin dynamics
+gamma_ln=1.0  # Friction coefficient (ps^-1)
+tempi=303.15   # Initial temp -- give it some small random velocities
+temp0=303.15   # Target temperature
+# Potential energy control
+cut=12.0      # nonbonded cutoff, in Angstroms
+fswitch=10.0  # Force-based switching
+# MD settings
+nstlim=125000 # 125K steps, 125 ps total
+dt=0.001      # time step (ps)
+# SHAKE
+ntc=2         # Constrain bonds containing hydrogen
+ntf=2         # Do not calculate forces of bonds containing hydrogen
+# Control how often information is printed
+ntpr=1000     # Print energies every 1000 steps
+ntwx=5000     # Print coordinates every 5000 steps to the trajectory
+ntwr=10000    # Print a restart file every 10K steps (can be less frequent)
+ntxo=2        # Write NetCrestraint_wt=1.0DF format
+ioutfm=1      # Write NetCDF format (always do this#)
+# Wrap coordinates when printing them to the same unit cell
+iwrap=0
+# Restraint options
+ntr=1         # Positional restraints for proteins, sugars, and ligands
+restraint_wt=1.0
+restraintmask='@CA,C,O,N&!:WAT'
+# Set water atom/residue names for SETTLE recognition
+watnam='WAT'  # Water residues are named WAT
+owtnm='O'     # Water oxygens are named O
+
+for i in $(seq 1 $neqi) ; do
+# redefine interative variables
+eval  "$( ( set -o posix ; set ) | grep neqi$i= | sed 's/_neqi'$i'//g') " 
+
+# print mdin file	
+echo "Equilibration run
+ &cntrl
+    imin=$imin, irest=$irest, ntx=$ntx, 
+    ntt=$ntt, gamma_ln=$gamma_ln, tempi=$tempi, temp0=$temp0,
+    cut=$cut, fswitch=$fswitch,
+    nstlim=$nstlim, dt=$dt, ntc=$ntc, ntf=$ntf,   
+    ntpr=$ntpr, ntwx=$ntwx, ntwr=$ntwr, ntxo=$ntxo, ioutfm=$ioutfm, iwrap=$iwrap,
+    ntr=$ntr, restraint_wt=$restraint_wt, restraintmask='$restraintmask',
+    watnam='$watnam', owtnm='$owtnm',
+ /
+ &ewald
+    vdwmeth = 0,
+ /
+END" > eqi$i.mdin
+
+done
+
+
+# print out a default production input 
+
+# Defualt production options (try not to change!)
+imin=0        # No minimization
+irest=1       # This IS a restart of an old MD simulation
+ntx=5        # So our inpcrd file has velocities
+# Temperature control
+ntt=3        # Langevin dynamics
+gamma_ln=1.0  # Friction coefficient (ps^-1)
+temp0=303.15   # Target temperature
+# Potential energy control
+cut=12.0      # nonbonded cutoff, in Angstroms
+fswitch=10.0  # Force-based switching
+# MD settings
+nstlim=25000000 # 100 ns total
+dt=0.004     # time step (ps)
+ntc=2         # Constrain bonds containing hydrogen
+ntf=2         # Do not calculate forces of bonds containing hydrogen
+# Control how often information is printed
+ntpr=25000    # Print energies every 100 ps
+ntwx=125000   # Print coordinates every 500 ps to the trajectory
+ntwr=125000   # Print a restart file every 500ps 
+ntxo=2        # Write NetCDF format
+ioutfm=1      # Write NetCDF format (always do this#)
+iwrap=1       # Wrap coordinates when printing them to the same unit cell
+# Restraint options
+ntr=0         # Positional restraints for proteins, sugars, and ligands
+restraint_wt=0.0
+restraintmask='@CA,C,O,N&!:WAT'
+# Constant pressure control.
+barostat=2    # MC barostat... change to 1 for Berendsen
+ntp=1         # 1=isotropic, 2=anisotropic, 3=semi-isotropic w/ surften
+pres0=1.0     # Target external pressure, in bar
+# Set water atom/residue names for SETTLE recognition
+watnam='WAT'  # Water residues are named WAT
+owtnm='O'     # Water oxygens are named O
+
+for i in $(seq 1 $npro) ; do
+# redefine interative variables
+eval  "$( ( set -o posix ; set ) | grep npro$i= | sed 's/_npro'$i'//g') " 
+
+# print mdin file
+echo "Production run
+ &cntrl
+    imin=$imin, irest=$irest, ntx=$ntx,   
+    ntt=$ntt, gamma_ln=$gamma_ln, temp0=$temp0,  
+    cut=$cut, fswitch=$fswitch,
+    nstlim=$nstlim, dt=$dt, ntc=$ntc, ntf=$ntf,  
+    ntpr=$ntpr, ntwx=$ntwx, ntwr=$ntwr, ntxo=$ntxo, ioutfm=$ioutfm, iwrap=$iwrap, 
+    ntr=$ntr, restraint_wt=$restraint_wt, restraintmask='$restraintmask', 
+    barostat=$barostat, ntp=$ntp, pres0=$pres0,  
+    watnam='$watnam', owtnm='$owtnm', 
+ /
+ &ewald
+    vdwmeth = 0,
+ /
+END" > pro$i.mdin
+
+done
+
+########################################################################################
+# INPUT SIMULATION SUBMISSIONS (DEFAULTS)
+########################################################################################
+
+# submission scripts, minimisations
+for i in $(seq 1 $nmin) ; do
+echo "#!/bin/csh
+mpirun pmemd.MPI -O -i min$i.mdin -p initial.parm7 -c initial.rst7 -o min$i.mdout -r min$i.rst7 -inf min$i.mdinfo -ref initial.rst7
+end" > minq$i
+pre=min$i
+done
+
+# submission scripts, equilibrations
+for i in $(seq 1 $neqi) ; do
+echo "#!/bin/csh
+pmemd.cuda_SPFP -O -i eqi$i.mdin -p initial.parm7 -c $pre.rst7 -o eqi$i.mdout -r eqi$i.rst7 -inf eqi$i.mdinfo -ref initial.rst7 -x eqi$i.nc
+end" > eqiq$i
+pre=eqi$i
+done
+
+# submission scripts, productions
+for i in $(seq 1 $npro) ; do
+echo "#!/bin/csh
+pmemd.cuda_SPFP -O -i pro$i.mdin -p initial.parm7 -c $pre.rst7 -o pro$i.mdout -r pro$i.rst7 -inf pro$i.mdinfo -ref initial.rst7 -x pro$i.nc
+end" > proq$i
+pre=pro$i
+done
+
 
 
 ########################################################################################
@@ -47,7 +270,7 @@ if [ $warc = 3 ] ; then
 	kp=$(echo $arc | cut -c 2)
 elif [ $warc = 4 ] ; then
 	COMPUTE=arc4.leeds.ac.uk
-	kp=''
+	kp=''!
 else
 	echo "arc compute undetermined"
 	exit=0
@@ -89,7 +312,7 @@ grep -v ANISOU $name.clean.pdb > $name.cleaner.pdb
 
 # if its this big then we really ought to use high memory
 highmem=no
-if [ $(wc -l < $name.cleaner.pdb) -gt 200000 ] ; then 
+if [ $(wc -l < $name.cleaner.pdb) -gt 500000 ] ; then 
 	highmem=yes
 fi
 
@@ -214,7 +437,7 @@ miny=$( grep ' CA ' $name.amber.pdb | cut -c 39-46 | sort -n | head -1 | sed 's/
 maxy=$( grep ' CA ' $name.amber.pdb | cut -c 39-46 | sort -n | tail -1 | sed 's/ //g' )
 minz=$( grep ' CA ' $name.amber.pdb | cut -c 47-54 | sort -n | head -1 | sed 's/ //g' )
 maxz=$( grep ' CA ' $name.amber.pdb | cut -c 47-54 | sort -n | tail -1 | sed 's/ //g' )
-pvolume=$( echo "( ( $maxx + $gap ) - ( $minx - $gap ) ) * ( ( $maxy + $gap ) - ( $miny - $gap ) ) * ( ( $maxz + $gap ) - ( $minz - $gap ) ) * 0.666 " | bc | awk -F'.' '{print $1}')
+pvolume=$( echo "( ( $maxx + $gap ) - ( $minx - $gap ) ) * ( ( $maxy + $gap ) - ( $miny - $gap ) ) * ( ( $maxz + $gap ) - ( $minz - $gap ) ) * 1.5 " | bc | awk -F'.' '{print $1}')
 
 # adjust volume by subtracting protein atoms - arbitratry factor of 5!
 advolume=$(( $(tail $name.amber.pdb | awk '{print $2}' | grep "\S" | tail -1) * 10 ))
@@ -285,42 +508,169 @@ date=$(echo $(date -R | cut -c 6-7,9-11,15-25 | sed 's/ /-/g;s/://g')-$rand)
 # make simulation folder and populate
 mkdir $date-amber-$name
 
-	# . . . with README's
-cp $templatedir/README* $date-amber-$name/.
+# SIMULATION ARC JOBS (DEFAULTS)
+########################################################################################
 
-	# . . . with qsub submission scripts
+# set arc parameters
+warc=$(echo $arc | cut -c 1)
 if [ $warc = 3 ] ; then 
-	sed "/^#$ -M.*/a #$ -N amin-$rand" $templatedir/run-amberA3-min.sh > $date-amber-$name/amin-$rand.sh
-	if [ $highmem = yes ] ; then
-		sed "/^#$ -M.*/a #$ -N amin-$rand" $templatedir/run-amberA3-mem-min.sh > $date-amber-$name/amin-$rand.sh
+	COMPUTE=arc3.leeds.ac.uk
+	CPU=24
+	kp=$(echo $arc | cut -c 2)
+	if [ $kp = p ] ; then 
+		GPU=p100
+	else
+		GPU=k80
 	fi
-	sed "/^#$ -M.*/a #$ -N apro-$rand" $templatedir/run-amberA3-pro$kp.sh | sed "/^#$ -N apro-$rand.*/a #$ -hold_jid amin-$rand" > $date-amber-$name/apro-$rand.sh
-	sed "/^#$ -M.*/a #$ -N apro-$rand" $templatedir/run-amberA3-rst$kp.sh | sed "/^#$ -N apro-$rand.*/a #$ -hold_jid amin-$rand" > $date-amber-$name/arst-$rand.sh.sh
+		
 elif [ $warc = 4 ] ; then
-	sed "/^#$ -M.*/a #$ -N amin-$rand" $templatedir/run-amberA4-min.sh > $date-amber-$name/amin-$rand.sh
-	if [ $highmem = yes ] ; then
-		sed "/^#$ -M.*/a #$ -N amin-$rand" $templatedir/run-amberA4-mem-min.sh > $date-amber-$name/amin-$rand.sh
-	fi
-	sed "/^#$ -M.*/a #$ -N apro-$rand" $templatedir/run-amberA4-pro.sh | sed "/^#$ -N apro-$rand.*/a #$ -hold_jid amin-$rand" > $date-amber-$name/apro-$rand.sh
-	sed "/^#$ -M.*/a #$ -N apro-$rand" $templatedir/run-amberA4-rst.sh | sed "/^#$ -N apro-$rand.*/a #$ -hold_jid amin-$rand" > $date-amber-$name/arst-$rand.sh.sh
+	COMPUTE=arc4.leeds.ac.uk
+	CPU=40
+	GPU=v100
 else
 	echo "arc compute undetermined"
 	exit=0
 fi 
 
+# list jobs
+ls -v minq* > joblist.tx
+ls -v eqiq* >> joblist.tx
+ls -v proq* >> joblist.tx
+
+first=1
+for i in $(cat joblist.tx) ; do 
+	nsub=$(echo $i | sed 's/.mdin//g')
+	if [ $(echo $nsub | cut -c 1-3 ) = min ] ; then 
+		echo "#!/bin/bash
+#$ -pe ib $CPU
+#$ -l h_vmem=4.5G
+#$ -l h_rt=48:0:0
+#$ -cwd -V
+#$ -m abe
+#$ -M chmjro@leeds.ac.uk
+#$ -N $nsub-$rand
+#$ -hold_jid $last
+module add amber
+./$nsub" > $nsub-$rand.sh
+		if [ $first = 1 ] ; then 
+			sed -i '/old_jid/d' $nsub-$rand.sh
+			first=2
+		fi 
+		
+	else
+		echo "#!/bin/bash
+#$ -l coproc_$GPU=1
+#$ -l h_rt=48:0:0
+#$ -cwd -V
+#$ -m abe
+#$ -M chmjro@leeds.ac.uk
+#$ -N $nsub-$rand
+#$ -hold_jid $last
+module add amber/20gpu
+./$nsub" > $nsub-$rand.sh
+	fi
+	last=$nsub-$rand
+done
+
+# check for highmem requirement
+if [ $highmem = yes ] ; then 
+	ls -v min*$rand.sh > joblist2.tx
+	for i in $(cat joblist2.tx) ; do 
+		sed -i "/^#!/bin/bash/a  node_type=$CPU\core-768G" $i
+		sed -i "s/vmem=4.5G/vmem=18G/g" $i
+	done
+fi
+
+# 
+
 	# . . . with md input files
-sed "s/XXXX/$(grep ' CA ' $name.explicit.pdb | wc -l )/g" $templatedir/step4.0_minimization.mdin > $date-amber-$name/step4.0_minimization.mdin 
-sed "s/XXXX/$(grep ' CA ' $name.explicit.pdb | wc -l )/g" $templatedir/step4.1_equilibration.mdin > $date-amber-$name/step4.1_equilibration.mdin 
-cp $templatedir/step5_production-explicit.mdin $date-amber-$name/step5_production.mdin
+cp min*.mdin $date-amber-$name/.
+cp eqi*.mdin $date-amber-$name/.
+cp pro*.mdin $date-amber-$name/.
 
 	# . . . with structure files
-mv $name.explicit.hmr.parm7 $date-amber-$name/step3_input.parm7
-mv $name.explicit.rst7 $date-amber-$name/step3_input.rst7
-mv $name.explicit.pdb $date-amber-$name/step3_input.pdb
+mv $name.explicit.hmr.parm7 $date-amber-$name/initial.parm7
+mv $name.explicit.rst7 $date-amber-$name/initial.rst7
+mv $name.explicit.pdb $date-amber-$name/initial.pdb
+
+	# . . . with md submission files
+cp *$rand.sh $date-amber-$name/.
+cp minq* $date-amber-$name/.
+cp eqiq* $date-amber-$name/.
+cp proq* $date-amber-$name/.
+
+chmod 755 $date-amber-$name/*
 
 	# pass to arc and submit jobs
 ssh $USER@$COMPUTE mkdir $remotedir/$date-amber-$name
 scp -r $date-amber-$name $USER@$COMPUTE:$remotedir/. 1>/dev/null
-ssh $USER@$COMPUTE "cd $remotedir/$date-amber-$name ; qsub amin-$rand.sh ; qsub apro-$rand.sh" > $date.tx 
+for i in $(ls -v min*$rand.sh) ; do 
+ssh $USER@$COMPUTE "cd $remotedir/$date-amber-$name ; qsub $i" > $date.tx 
+done
+for i in $(ls -v eqi*$rand.sh) ; do 
+ssh $USER@$COMPUTE "cd $remotedir/$date-amber-$name ; qsub $i" > $date.tx 
+done
+for i in $(ls -v pro*$rand.sh) ; do 
+ssh $USER@$COMPUTE "cd $remotedir/$date-amber-$name ; qsub $i" > $date.tx 
+done
+
+
+
+
+# POST Production
+########################################################################################
+# run this script once complete!!
+
+echo "#!/bin/bash
+
+ls -v pro*.nc > nc.list
+
+# determine the fixed positions for auto imaging
+epro=\$(grep ' CA  [A-Z][A-Z][A-Z] '  initial.pdb | nl | tail -1 | awk '{print \$1}')
+
+echo 'parm initial.parm7' > cpptraj.in
+sed 's/^/trajin /g' nc.list > nct.list
+cat nct.list >> cpptraj.in
+
+echo 'strip :WAT outprefix traj
+center :1-'\$epro' mass origin
+image origin center
+trajout traj.dcd
+trajout traj.pdb onlyframes 1
+trajout traj.rst7 onlyframes 1
+cluster clusters 10 repout topcluster repfmt pdb out cnumvtime.dat summary avg.summary.dat
+readdata pro*.mdout name MDOUT
+writedata temp.dat MDOUT[TEMP] time 0.00002
+writedata etot.dat MDOUT[Etot] time 0.00002
+writedata density.dat MDOUT[Density] time 0.00002
+writedata volume.dat MDOUT[VOLUME] time 0.00002
+2drms :1-'\$epro'@CA&!@H= rmsout 2drms-all-residues.gnu
+average average.pdb pdb
+rms ToproFirst :1-'\$epro'&!@H= first out rmsdpro.agr mass
+atomicfluct :1-'\$epro'&!@H= byres out fluctpro.agr
+atomicfluct :1-'\$epro'@CA&!@H= byres bfactor out fluctbfact.agr
+run
+exit ' >> cpptraj.in
+
+module add amber/16
+cpptraj -i cpptraj.in
+
+mkdir trajout
+mv traj* trajout/.
+mv *.dat trajout/.
+mv topcluster* trajout/.
+mv *agr trajout/.
+mv average.pdb trajout/.
+mv avg.summary.dat trajout/.
+sed -i \"s/pause -1/set terminal png size 1200,1200\nset output 'rmsd-matrix.png'\nreplot\nquit/g\" 2drms-all-residues.gnu
+gnuplot 2drms-all-residues.gnu
+mv 2drms-all-residues.gnu trajout/.
+mv rmsd-matrix.png trajout/.
+
+" > jr-amber-post-process.sh
+chmod 755 jr-amber-post-process.sh
+scp -r jr-amber-post-process.sh $USER@$COMPUTE:$remotedir/$date-amber-$name/. 1>/dev/null
+
+exit 0
 
 
