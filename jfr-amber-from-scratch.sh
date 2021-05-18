@@ -303,6 +303,8 @@ else
 	echo "load $pdb" > clean.pml
 fi 
 echo "remove ! polymer
+remove hydrogens
+alter r. HSD, resn='HIS'
 remove not alt ''+A
 alter all, alt='' 
 save $name.clean.pdb, $name, state=0" >> clean.pml
@@ -546,7 +548,7 @@ for i in $(cat joblist.tx) ; do
 #$ -l h_vmem=4.5G
 #$ -l h_rt=48:0:0
 #$ -cwd -V
-#$ -m abe
+#$ -m n
 #$ -M chmjro@leeds.ac.uk
 #$ -N $nsub-$rand
 #$ -hold_jid $last
@@ -562,7 +564,7 @@ module add amber
 #$ -l coproc_$GPU=1
 #$ -l h_rt=48:0:0
 #$ -cwd -V
-#$ -m abe
+#$ -m n
 #$ -M chmjro@leeds.ac.uk
 #$ -N $nsub-$rand
 #$ -hold_jid $last
