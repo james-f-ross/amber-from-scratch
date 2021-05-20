@@ -303,12 +303,15 @@ else
 	echo "load $pdb" > clean.pml
 fi 
 echo "remove ! polymer
+remove hydrogens
 remove not alt ''+A
 alter all, alt='' 
 save $name.clean.pdb, $name, state=0" >> clean.pml
 pymol -qc clean.pml
 grep -v ANISOU $name.clean.pdb > $name.cleaner.pdb
 
+sed -i 's/HIE/HIS/g;s/HSD/HIS/g;s/HSE/HIS/g;s/CYX/CYS/g' $name.cleaner.pdb
+sed -i 's/CD  ILE/CD1 ILE/g;s/OT1/O  /g;s/OT2/OXT/g' $name.cleaner.pdb
 
 # if its this big then we really ought to use high memory
 highmem=no
