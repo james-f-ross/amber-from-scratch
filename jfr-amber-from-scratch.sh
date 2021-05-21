@@ -27,7 +27,7 @@ templatedir=~/work/8-scripts/1-MD-scripts/amber-from-scratch
 arc=3p				# either 3k 3p or 4 		# 3k = arc3-K80, 3p = arc3-P100, 4 = arc4-V100
 
 # define arc login and report details
-USER=chmjro                 # string                # your username on the remote machine, if required
+USER=user                # string                # your username on the remote machine, if required
 
 ########################################################################################
 # DECLARE NON-DEFAULT INPUT OPTIONS
