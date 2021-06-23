@@ -636,6 +636,7 @@ sed 's/^/trajin /g' nc.list > nct.list
 cat nct.list >> cpptraj.in
 
 echo 'strip :WAT outprefix traj
+autoimage
 center :1-'\$epro' mass origin
 image origin center
 trajout traj.dcd
